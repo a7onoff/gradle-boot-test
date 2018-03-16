@@ -1,16 +1,18 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.0.0.RELEASE")
-    }
-}
+import groovy.xml.MarkupBuilder
+import org.jooq.util.GenerationTool
+import javax.xml.bind.JAXB
 
 apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
 
 bootJar {
     baseName = 'gradle-boot'
@@ -18,6 +20,7 @@ bootJar {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
@@ -25,8 +28,60 @@ sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
 dependencies {
-    compile("org.springframework.boot:spring-boot-starter-web")
-    compile("org.springframework.boot:spring-boot-starter-actuator")
-    testCompile("junit:junit")
-    testCompile("org.springframework.boot:spring-boot-starter-test")
+    compile 'org.jooq:jooq:3.10.5'
+    runtime 'org.postgresql:postgresql:42.2.1'
+
+    compile 'org.springframework.boot:spring-boot-starter-web-services:2.0.0.RELEASE'
+    compile 'org.springframework.boot:spring-boot-starter-actuator:2.0.0.RELEASE'
+
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.springframework.boot:spring-boot-starter-test:2.0.0.RELEASE'
 }
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.jooq:jooq-codegen:3.10.5'
+        classpath 'org.postgresql:postgresql:42.2.1'
+        classpath 'org.springframework.boot:spring-boot-gradle-plugin:2.0.0.RELEASE'
+    }
+}
+
+def writer = new StringWriter()
+new MarkupBuilder(writer)
+        .configuration('xmlns': 'http://www.jooq.org/xsd/jooq-codegen-3.10.0.xsd') {
+    jdbc() {
+        driver('org.postgresql.Driver')
+        url('jdbc:postgresql://localhost:5432/local_test')
+        user('postgres')
+        password('11')
+    }
+    generator() {
+
+        database() {
+            inputSchema('public')
+        }
+
+        // Watch out for this caveat when using MarkupBuilder with "reserved names"
+        // - https://github.com/jOOQ/jOOQ/issues/4797
+        // - http://stackoverflow.com/a/11389034/521799
+        // - https://groups.google.com/forum/#!topic/jooq-user/wi4S9rRxk4A
+        generate([:]) {
+            pojos true
+            daos true
+        }
+        target() {
+            packageName('geodata.db')
+            directory('src/main/java')
+        }
+    }
+}
+
+// Run the code generator
+// ----------------------
+GenerationTool.generate(
+        JAXB.unmarshal(new StringReader(writer.toString()), org.jooq.util.jaxb.Configuration.class)
+)
