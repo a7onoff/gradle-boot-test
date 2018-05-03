@@ -8,6 +8,6 @@ public class BaseController {
 
     @RequestMapping
     public String index() {
-        return "It works! dsa";
+        return "It works!";
     }
 }
